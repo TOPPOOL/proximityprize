@@ -2,7 +2,7 @@ import json, os, pathlib, subprocess, urllib.request, shutil
 root = pathlib.Path(os.environ['RUNNER_TEMP']) / 'kernel-review'
 root.mkdir()
 project = pathlib.Path.cwd()
-lean = pathlib.Path(subprocess.check_output(['which','lean'],text=True).strip()).resolve()
+lean = pathlib.Path(subprocess.check_output(['elan','which','lean'],text=True).strip()).resolve()
 stdlib = lean.parent.parent / 'lib/lean'
 search = [stdlib]
 for package in (project / '.lake/packages').iterdir():
@@ -25,5 +25,6 @@ for target in json.loads(pathlib.Path('review-targets.json').read_text()):
         print('PR',target['number'],target['head'],path,'EXIT',result.returncode,flush=True)
         print(result.stdout+result.stderr,flush=True)
         records.append({'pr':target['number'],'head':target['head'],'path':path,'exit':result.returncode,'output':result.stdout+result.stderr})
+        pathlib.Path('kernel-review-results.json').write_text(json.dumps(records,indent=2))
         if result.returncode or 'sorryAx' in result.stdout: raise SystemExit(1)
 pathlib.Path('kernel-review-results.json').write_text(json.dumps(records,indent=2))
