@@ -1,0 +1,30 @@
+name: Focused isolated kernel review
+on:
+  workflow_dispatch:
+jobs:
+  replay:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: leanprover/lean-action@v1.6.0
+        with:
+          auto-config: false
+          build: false
+          test: false
+          lint: false
+          use-github-cache: false
+          use-mathlib-cache: false
+      - name: Fetch pinned dependency artifacts
+        run: ./scripts/lake-locked.sh exe cache get
+      - name: Replay inspected proof files without network or credentials
+        run: python3 scripts/focused-kernel-review.py
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: focused-kernel-review
+          path: kernel-review-results.json
