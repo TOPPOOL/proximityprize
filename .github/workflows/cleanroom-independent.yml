@@ -1,0 +1,40 @@
+name: Cleanroom independent Linux validation
+on:
+  workflow_dispatch:
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: 906acd9db47435d3b555a1a25fb706190fe14f71
+          persist-credentials: false
+      - uses: actions/setup-python@v7
+        with:
+          python-version: '3.12'
+      - name: Install validation dependency
+        run: python3 -m pip install -r scripts/requirements-validation.txt
+      - uses: leanprover/lean-action@v1.6.0
+        with:
+          auto-config: false
+          build: false
+          test: false
+          lint: false
+          use-github-cache: false
+          use-mathlib-cache: false
+      - name: Run complete Python suite with real Lean fixture
+        run: |
+          export LEAN_TEST_EXECUTABLE="$(command -v lean)"
+          python3 -m unittest discover -s scripts/tests -v
+      - name: Validate non-build source gates
+        run: |
+          python3 scripts/forbidden_tokens.py
+          python3 scripts/sorry_census.py --fail-on-holes
+          python3 scripts/proximity_prize_cleanroom_audit.py --dry-run
+          python3 scripts/check-docs-integrity.py
+          python3 scripts/kb/check_generated.py
+          python3 scripts/kb/lint.py --strict-cited-pages
+          git diff --check
