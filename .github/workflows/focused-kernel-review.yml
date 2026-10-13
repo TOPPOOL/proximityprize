@@ -21,8 +21,8 @@ jobs:
           use-mathlib-cache: false
       - name: Fetch pinned dependency artifacts
         run: ./scripts/lake-locked.sh exe cache get
-      - name: Install filesystem sandbox
-        run: sudo apt-get update -qq && sudo apt-get install -y bubblewrap
+      - name: Prepare isolated runtime
+        run: docker pull ubuntu:24.04
       - name: Replay inspected proof files without network or credentials
         run: python3 scripts/focused-kernel-review.py
       - uses: actions/upload-artifact@v7
