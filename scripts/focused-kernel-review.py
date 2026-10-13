@@ -25,7 +25,7 @@ for target in json.loads(pathlib.Path('review-targets.json').read_text()):
         paths.append(destination)
     for path in target['paths']:
         source=local/path
-        args=['docker','run','--rm','--network','none','--read-only','--cap-drop','ALL','--security-opt','no-new-privileges','--tmpfs','/tmp',*mounts,'-w','/work','-e','HOME=/work','-e','LEAN_PATH='+':'.join(paths),'ubuntu:24.04','/toolchain/bin/lean','-o','/work/'+str(pathlib.Path(path).with_suffix('.olean')),'/work/'+path]
+        args=['docker','run','--rm','--user',str(os.getuid())+':'+str(os.getgid()),'--network','none','--read-only','--cap-drop','ALL','--security-opt','no-new-privileges','--tmpfs','/tmp',*mounts,'-w','/work','-e','HOME=/work','-e','LEAN_PATH='+':'.join(paths),'ubuntu:24.04','/toolchain/bin/lean','-o','/work/'+str(pathlib.Path(path).with_suffix('.olean')),'/work/'+path]
         result=subprocess.run(args,cwd=local,capture_output=True,text=True,timeout=300)
         print('PR',target['number'],target['head'],path,'EXIT',result.returncode,flush=True)
         print(result.stdout+result.stderr,flush=True)
