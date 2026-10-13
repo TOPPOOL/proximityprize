@@ -17,10 +17,18 @@ for target in json.loads(pathlib.Path('review-targets.json').read_text()):
         source.parent.mkdir(parents=True, exist_ok=True)
         url='https://raw.githubusercontent.com/SlopDotCash/proximityprize/'+target['head']+'/'+path
         source.write_bytes(urllib.request.urlopen(url,timeout=30).read())
-    env={'PATH':'/usr/bin:/bin','HOME':str(local),'TMPDIR':str(local),'LEAN_PATH':os.pathsep.join(map(str,[local,*search]))}
+    mounts=['--ro-bind',str(lean.parent.parent),'/toolchain','--bind',str(local),'/work']
+    paths=['/work','/toolchain/lib/lean']
+    for index, artifacts in enumerate(search[1:]):
+        destination='/deps/'+str(index)
+        mounts += ['--ro-bind',str(artifacts),destination]
+        paths.append(destination)
+    for system in ('/usr','/lib','/lib64'):
+        if pathlib.Path(system).exists(): mounts += ['--ro-bind',system,system]
+    env=['--setenv','HOME','/work','--setenv','TMPDIR','/tmp','--setenv','LEAN_PATH',':'.join(paths)]
     for path in target['paths']:
         source=local/path
-        args=['sudo','unshare','--net','--', '/usr/bin/env','-i', *[k+'='+v for k,v in env.items()],str(lean),'-o',str(source.with_suffix('.olean')),str(source)]
+        args=['sudo','bwrap','--unshare-all','--die-with-parent','--clearenv',*mounts,'--proc','/proc','--dev','/dev','--tmpfs','/tmp','--chdir','/work',*env,'/toolchain/bin/lean','-o','/work/'+str(pathlib.Path(path).with_suffix('.olean')),'/work/'+path]
         result=subprocess.run(args,cwd=local,capture_output=True,text=True,timeout=300)
         print('PR',target['number'],target['head'],path,'EXIT',result.returncode,flush=True)
         print(result.stdout+result.stderr,flush=True)
