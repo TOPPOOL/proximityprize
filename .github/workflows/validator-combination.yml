@@ -31,9 +31,10 @@ jobs:
         run: |
           mkdir -p "$RUNNER_TEMP/combined-source"
           git archive HEAD | tar -x -C "$RUNNER_TEMP/combined-source"
-          git ls-files --stage -- ArkLib Research > "$RUNNER_TEMP/combined-source/index-records"
+          git ls-files --stage > "$RUNNER_TEMP/combined-source/index-records"
+          cp -a "$RUNNER_TEMP/combined-source/docs/kb/_generated" "$RUNNER_TEMP/generated-cache"
           toolchain="$(dirname "$(dirname "$(elan which lean)")")"
-          docker run --rm --network none --read-only --cap-drop ALL --security-opt no-new-privileges --memory 3g --tmpfs /tmp:rw,exec,nosuid,size=512m \
+          docker run --rm --user "$(id -u):$(id -g)" --network none --read-only --cap-drop ALL --security-opt no-new-privileges --memory 3g --tmpfs /tmp:rw,exec,nosuid,size=512m \
             -v "$RUNNER_TEMP/combined-source:/workspace:ro" -v "$toolchain:/toolchain:ro" \
-            -w /workspace -e HOME=/tmp -e LEAN_TEST_EXECUTABLE=/toolchain/bin/lean -e PYTHONDONTWRITEBYTECODE=1 \
+            -v "$RUNNER_TEMP/generated-cache:/workspace/docs/kb/_generated:rw" -w /workspace -e HOME=/tmp -e LEAN_TEST_EXECUTABLE=/toolchain/bin/lean -e PYTHONDONTWRITEBYTECODE=1 \
             validator-runtime bash -eu -c 'python3 -m unittest discover -s scripts/tests -v; python3 scripts/forbidden_tokens.py; python3 scripts/sorry_census.py --fail-on-holes; python3 scripts/proximity_prize_cleanroom_audit.py --dry-run; python3 scripts/check-docs-integrity.py; git init --bare -q /tmp/generated-index; GIT_DIR=/tmp/generated-index GIT_WORK_TREE=/workspace git update-index --index-info < index-records; GIT_DIR=/tmp/generated-index GIT_WORK_TREE=/workspace python3 scripts/kb/check_generated.py; python3 scripts/kb/lint.py --strict-cited-pages'
