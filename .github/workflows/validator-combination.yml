@@ -1,0 +1,58 @@
+name: Isolated Slop compliance audit
+on:
+  workflow_dispatch:
+jobs:
+  replay:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - name: Fetch exact inspected public sources and verify SHA-256
+        run: |
+          python3 - <<'PY'
+          import hashlib,json,os,pathlib,urllib.request
+          root=pathlib.Path(os.environ['RUNNER_TEMP'])/'slop-audit-inputs'
+          root.mkdir()
+          targets=[{'name': 'pr230-probe.py', 'pr': 230, 'head': '8ca29ca704b2be121b553d247bf030f991436f71', 'path': 'scripts/probes/probe_antipodal_subgroup_obstructions.py', 'sha256': '402f922486e17c31934baeed5da1224f540f935d8c8869410e902d031e62c270'}, {'name': 'pr222-five.py', 'pr': 222, 'head': 'f5cbee0fab99dce92f17091402dc6a04ed998d86', 'path': 'scripts/probes/probe_syz3_five_core_predecessor.py', 'sha256': 'd34cc33547cd26201370bb265a1c8260e425442512ad65466e54b7b0aaa05ab7'}, {'name': 'pr222-expanded.py', 'pr': 222, 'head': 'f5cbee0fab99dce92f17091402dc6a04ed998d86', 'path': 'scripts/probes/probe_incidence_expanded_cores.py', 'sha256': '1152f806cd90d1a59e43d7d966cf4e611cb93357cb12d749a98611803a257443'}, {'name': 'pr222-full.py', 'pr': 222, 'head': 'f5cbee0fab99dce92f17091402dc6a04ed998d86', 'path': 'scripts/probes/probe_incidence_full_scale_cores.py', 'sha256': '6aa18dc82f6108dee18240c7a4b39800d5640381e347f162d299a8325966f326'}, {'name': 'pr224-probe.py', 'pr': 224, 'head': 'd176d97a8b11e1e286ea55592eab4e466b0ff36e', 'path': 'scripts/probes/probe_sponsor_finite_audit.py', 'sha256': '487ab95ae13e2afa2d6e215c039d9d29900740e0df7653be0253947076ccb6b1'}, {'name': 'pr228-old.py', 'pr': 228, 'head': '600bb5cae9ca67e71962d273f0caf7d59edb76c3', 'path': 'scripts/forbidden_tokens.py', 'sha256': 'ae7a5725de5a5e339d99e22510631a6e7a649318dd518d7a1249e75d9e7b5ca3'}, {'name': 'pr228-new.py', 'pr': 228, 'head': 'ade3ca51a0487de36957df10a51b7a41cfcf65eb', 'path': 'scripts/forbidden_tokens.py', 'sha256': '2d73eb12257f49e4ce329ab6f88291e5648de3e590993c5faa2d09d831f8ec0d'}, {'name': 'pr231-old.py', 'pr': 231, 'head': 'e177dc4a5a4a6bd6aa4cdbbe4bdd2f8bea22f2c6', 'path': 'scripts/sorry_census.py', 'sha256': '31b9039831d5641e5ea5e602a4cbfbb75251531b93d8e10d9417b51cfaf93b39'}, {'name': 'pr231-new.py', 'pr': 231, 'head': '44b42ca2e57c7e2953bbe93d443cdfc8edea1f51', 'path': 'scripts/sorry_census.py', 'sha256': 'e6e450d02d46f5f886a22312d1158abee62bb6fe115b97606561c6fca86f509c'}, {'name': 'pr234.py', 'pr': 234, 'head': '1a0ee8bb9fcb7908545d8a1041da07a15e4e0f5a', 'path': 'scripts/forbidden_tokens.py', 'sha256': '111eb0a4ee2ef25662779078f222d7e9367bfd9484f6d46be5167853572f1584'}]
+          for target in targets:
+              url='https://raw.githubusercontent.com/SlopDotCash/proximityprize/'+target['head']+'/'+target['path']
+              data=urllib.request.urlopen(url,timeout=40).read()
+              assert hashlib.sha256(data).hexdigest()==target['sha256'],target['name']
+              (root/target['name']).write_bytes(data)
+          (root/'worker.py').write_text('"""Trusted controller; all PR code executes only inside the isolated container."""\nimport json\nfrom pathlib import Path\nimport shutil\nimport subprocess\nimport sys\nimport tempfile\n\ninputs = Path(\'/fixtures\')\nrecords = []\n\ndef execute(name, args, root, expected):\n    result = subprocess.run([sys.executable, \'-I\', *args], cwd=root,\n                            capture_output=True, text=True, timeout=60)\n    records.append({\'case\': name, \'command\': [\'python\', \'-I\', *args],\n                    \'exit\': result.returncode, \'expected_exit\': expected,\n                    \'stdout\': result.stdout, \'stderr\': result.stderr})\n    assert result.returncode == expected, records[-1]\n    return result\n\nfor name in (\'pr230-probe.py\', \'pr222-five.py\', \'pr222-expanded.py\',\n             \'pr222-full.py\', \'pr224-probe.py\'):\n    execute(name, [str(inputs / name)], \'/tmp\', 0)\n\nquoted = (\'def «an axiom counterfeit» : Nat := 0\\n\'\n          \'theorem actual_equality : «an axiom counterfeit» = 0 := rfl\\n\'\n          \'#print axioms actual_equality\\n\')\nhole = (\'theorem prizeAuditProbe : 1 = 1 := by\\n\'\n        \'  let _ : Nat := dbg_trace "{(sorry : Nat)}"; 0\\n\'\n        \'  rfl\\n#print axioms prizeAuditProbe\\n\')\ncases = [\n    (\'quoted-old\', \'pr228-old.py\', quoted, 1, None),\n    (\'quoted-fixed\', \'pr228-new.py\', quoted, 0, None),\n    (\'actual-quoted-axiom\', \'pr228-new.py\', \'axiom «quoted name» : False\\n\', 1, None),\n    (\'interpolation-old\', \'pr231-old.py\', hole, 0, 0),\n    (\'interpolation-fixed\', \'pr231-new.py\', hole, 1, 1),\n    (\'unsafe-nonrec-missed\', \'pr234.py\', \'unsafe nonrec def helper : Nat := 0\\n#check helper\\n\', 0, None),\n    (\'unsafe-direct-control\', \'pr234.py\', \'unsafe def helper : Nat := 0\\n#check helper\\n\', 1, None),\n]\nfor name, scanner, fixture, expected, holes in cases:\n    with tempfile.TemporaryDirectory(prefix=name+\'-\', dir=\'/tmp\') as directory:\n        root = Path(directory)\n        scripts = root / \'scripts\'\n        scripts.mkdir()\n        target = scripts / (\'sorry_census.py\' if holes is not None else \'forbidden_tokens.py\')\n        shutil.copyfile(inputs / scanner, target)\n        (scripts / \'residual_axioms.txt\').write_text(\'\')\n        source = root / \'Research/ProximityPrize/Frontier/Fixture.lean\'\n        source.parent.mkdir(parents=True)\n        source.write_text(fixture, encoding=\'utf-8\')\n        if holes is None:\n            args = [str(target), str(source)]\n        else:\n            args = [str(target), \'--root\', str(root), \'--fail-on-holes\',\n                    \'--baseline\', str(root/\'absent-baseline.json\')]\n        result = execute(name, args, str(root), expected)\n        if holes is not None:\n            summary, _ = json.JSONDecoder().raw_decode(result.stdout.lstrip())\n            assert summary[\'holes\'] == holes, summary\n        records[-1][\'source\'] = fixture\n\nprint(json.dumps(records, indent=2, ensure_ascii=False))\n',encoding='utf-8')
+          pathlib.Path('source-identities.json').write_text(json.dumps(targets,indent=2))
+          PY
+      - name: Resolve trusted Python image to immutable digest
+        run: |
+          docker pull python:3.12-slim
+          docker image inspect python:3.12-slim --format '{{index .RepoDigests 0}}' > python-image-digest.txt
+      - name: Execute in credential-free network-disabled OS sandbox
+        run: |
+          python3 - <<'PY'
+          import json,os,pathlib,subprocess
+          root=pathlib.Path(os.environ['RUNNER_TEMP'])/'slop-audit-inputs'
+          image=pathlib.Path('python-image-digest.txt').read_text().strip()
+          args=['docker','run','--rm','--network','none','--read-only','--cap-drop','ALL','--security-opt','no-new-privileges','--user','65534:65534','--pids-limit','64','--memory','512m','--cpus','2','--tmpfs','/tmp:rw,noexec,nosuid,size=64m','-v',str(root)+':/fixtures:ro','-w','/tmp','-e','HOME=/tmp','-e','PYTHONDONTWRITEBYTECODE=1',image,'python','-I','/fixtures/worker.py']
+          r=subprocess.run(args,capture_output=True,text=True,timeout=300)
+          pathlib.Path('os-sandbox-stdout.log').write_text(r.stdout)
+          pathlib.Path('os-sandbox-stderr.log').write_text(r.stderr)
+          pathlib.Path('os-sandbox-command.json').write_text(json.dumps(args,indent=2))
+          assert r.returncode==0,r.stderr
+          records=json.loads(r.stdout);assert len(records)==12
+          assert all(x['exit']==x['expected_exit'] for x in records)
+          pathlib.Path('os-sandbox-results.json').write_text(json.dumps(records,indent=2,ensure_ascii=False))
+          print('PASS: five exact arithmetic probes and seven scanner regression/control cases in OS isolation.')
+          PY
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: slop-os-sandbox-audit
+          path: |
+            os-sandbox-*.json
+            os-sandbox-*.log
+            source-identities.json
+            python-image-digest.txt
