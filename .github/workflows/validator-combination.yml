@@ -1,0 +1,38 @@
+name: Isolated validator combination
+on:
+  workflow_dispatch:
+jobs:
+  combination:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: leanprover/lean-action@v1.6.0
+        with:
+          auto-config: false
+          build: false
+          test: false
+          lint: false
+          use-github-cache: false
+          use-mathlib-cache: false
+      - name: Prepare trusted Ubuntu Python and compiler runtime
+        run: |
+          mkdir -p "$RUNNER_TEMP/combination-runtime"
+          cat > "$RUNNER_TEMP/combination-runtime/Dockerfile" <<'EOF'
+          FROM ubuntu:24.04
+          RUN apt-get update -qq && apt-get install -y python3 python3-pip g++ bash git && python3 -m pip install --break-system-packages numpy==2.4.4
+          EOF
+          docker build -t validator-runtime "$RUNNER_TEMP/combination-runtime"
+      - name: Execute inspected combined scripts with no network or credentials
+        run: |
+          mkdir -p "$RUNNER_TEMP/combined-source"
+          git archive HEAD | tar -x -C "$RUNNER_TEMP/combined-source"
+          toolchain="$(dirname "$(dirname "$(elan which lean)")")"
+          docker run --rm --network none --read-only --cap-drop ALL --security-opt no-new-privileges --memory 3g --tmpfs /tmp \
+            -v "$RUNNER_TEMP/combined-source:/workspace:ro" -v "$toolchain:/toolchain:ro" \
+            -w /workspace -e HOME=/tmp -e LEAN_TEST_EXECUTABLE=/toolchain/bin/lean -e PYTHONDONTWRITEBYTECODE=1 \
+            validator-runtime bash -eu -c 'python3 -m unittest discover -s scripts/tests -v; python3 scripts/forbidden_tokens.py; python3 scripts/sorry_census.py --fail-on-holes; python3 scripts/proximity_prize_cleanroom_audit.py --dry-run; python3 scripts/check-docs-integrity.py; python3 scripts/kb/check_generated.py; python3 scripts/kb/lint.py --strict-cited-pages'
