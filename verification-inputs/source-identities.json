@@ -1,0 +1,36 @@
+{
+  "own_pr233_head": "26a035566428d6710e0fee26d469e8ff298b2ae8",
+  "imported_sources": [
+    {
+      "pr": "228",
+      "head": "c77cafb10b7cad1960d583d985a68253ace7f993",
+      "path": "scripts/forbidden_tokens.py",
+      "sha256": "5b504a181208f5bb72f819fc4c41ec940b542d34f99357071c5647d5b7c3aacc"
+    },
+    {
+      "pr": "228",
+      "head": "c77cafb10b7cad1960d583d985a68253ace7f993",
+      "path": "scripts/tests/test_forbidden_tokens_bypasses.py",
+      "sha256": "40b98130da54d4372492188f3e5064814954090a959a15decf409d89b7c5e6d0"
+    },
+    {
+      "pr": "231",
+      "head": "44b42ca2e57c7e2953bbe93d443cdfc8edea1f51",
+      "path": "scripts/sorry_census.py",
+      "sha256": "e6e450d02d46f5f886a22312d1158abee62bb6fe115b97606561c6fca86f509c"
+    },
+    {
+      "pr": "231",
+      "head": "44b42ca2e57c7e2953bbe93d443cdfc8edea1f51",
+      "path": "scripts/tests/test_sorry_census.py",
+      "sha256": "66b6374fecb71bfbda6af7f36a48e2bdb753a609c9965aa21c247743ce9a8c71"
+    },
+    {
+      "pr": "234",
+      "head": "f66be2fd6ed7fe8bd4db8ba6342f83f796ff11e2",
+      "path": "scripts/tests/test_forbidden_tokens_unsafe.py",
+      "sha256": "189163b6b6fa9ee29890652b341c14ce309e9f1d33bd804232cb30db52a99adf"
+    }
+  ],
+  "purpose": "Verification-only integration; original PR authors retain authorship. Quoted-scope fix and its two genuine Lean-output regressions are new."
+}
